@@ -1,18 +1,29 @@
+#define GLEW_STATIC
+#include <GL/glew.h>
+
 #include <GLFW/glfw3.h>
+
 #include <windows.h>
+
 #include <gl/GLU.h>
+
 #include <iostream>
+#include <fstream>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 using namespace std;
 
 void setCameraPerspective(GLFWwindow* window);
 
-void drawSphere();
-void drawPlane();
+void drawSphere(int textureID);
+void drawPlane(int textureID);
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+unsigned int loadTexture(const char* texturePath);
 
 const int WINDOW_WIDTH = 1800;
 const int WINDOW_HEIGHT = 900;
@@ -24,16 +35,17 @@ double lastY = WINDOW_HEIGHT / 2.0;
 
 float cameraPositionX = 0.0f;
 float cameraPositionY = 0.0f;
-float cameraPositionZ = 3.0f;
+float cameraPositionZ = 6.0f;
 
 float yaw = -90.0f;
 float pitch = 30.0f;
 
-float currentFallPosition = 2.0f;
+float currentFallPosition = 6.0f;
 float fallPosition = currentFallPosition;
-float fallSpeed = 0.001f;
+float fallSpeed = 0.0f;
+float jumpSpeed;
 float fallAcceleration = 0.00001f;
-float jumpAcceleration = 0.00001f;
+float jumpAcceleration = 0.0000065f;
 boolean isFalling = true;
 
 
@@ -60,16 +72,23 @@ int main(void)
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
 
+    if (glewInit() != GLEW_OK) {
+        cout << "Failed to initialize GLEW" << endl;
+        return -1;
+    }
+
+    //glEnable(GL_TEXTURE_2D);
+    unsigned int planeTextureID = loadTexture("src\\planTexture.jpg");
+    unsigned int ballTextureID = loadTexture("src\\ballTexture.jpg");
+
     while (!glfwWindowShouldClose(window))
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        drawPlane();
-
-        drawSphere();
+        drawPlane(planeTextureID);
+        drawSphere(ballTextureID);
 
         setCameraPerspective(window);
-
 
         glfwSwapBuffers(window);
 
@@ -97,14 +116,47 @@ void setCameraPerspective(GLFWwindow* window) {
     glTranslatef(cameraPositionX, cameraPositionY, cameraPositionZ);
 
     gluLookAt(cameraPositionX, cameraPositionY, cameraPositionZ, 0.0f, 0.0f, 0.0f, 0.0f, 0.1f, 0.0f);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 }
 
-void drawSphere() {
+unsigned int loadTexture(const char* texturePath) {
+    std::ifstream file(texturePath);
+    if (!file.is_open()) {
+        cout << "Failed to open texture file" << endl;
+        return 0;
+    }
+    file.close();
+
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load(texturePath, &width, &height, &nrChannels, 0);
+    if (data) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else {
+        std::cout << "Failed to load texture" << std::endl;
+    }
+    stbi_image_free(data);
+
+    return texture;
+}
+
+void drawSphere(int textureID) {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
     GLUquadric* quad = gluNewQuadric();
-    gluQuadricDrawStyle(quad, GLU_LINE);
+    gluQuadricDrawStyle(quad, GLU_FILL);
+
+    gluQuadricTexture(quad, GL_TRUE);
 
     glTranslatef(0.0f, fallPosition, 0.0f);
 
@@ -116,39 +168,55 @@ void drawSphere() {
             }
             else {
                 isFalling = false;
+                jumpSpeed = fallSpeed / 1.5;
             }
         }
         else {
             if (fallPosition <= 0.7 * currentFallPosition) {
-                fallPosition += fallSpeed;
-                fallSpeed -= jumpAcceleration;
+                fallPosition += jumpSpeed;
+                if (jumpSpeed - jumpAcceleration > 0.0f) {
+                    jumpSpeed -= jumpAcceleration;
+                }
             }
             else {
                 currentFallPosition = 0.7 * currentFallPosition;
-                fallSpeed = 0.001f;
                 isFalling = true;
+                fallSpeed = 0.0f;
             }
         }
     }
 
-    glColor3f(1.0f, 0.0f, 0.0f);
     gluSphere(quad, 0.3, 40, 40);
+
     gluDeleteQuadric(quad);
 }
 
-void drawPlane() {
+void drawPlane(int textureID) {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    glBegin(GL_QUADS);    
+    glBindTexture(GL_TEXTURE_2D, textureID);
 
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glVertex3f(-2.0f, 0.0f, -2.0f);
-    glVertex3f(-2.0f, 0.0f, 2.0f);
-    glVertex3f(2.0f, 0.0f, 2.0f);
-    glVertex3f(2.0f, 0.0f, -2.0f);
+    glBegin(GL_QUADS);
+
+        glTexCoord2f(0.0f, 0.0f);
+        glVertex3f(-2.0f, 0.0f, -2.0f);
+
+        glTexCoord2f(0.0f, 1.0f);
+        glVertex3f(-2.0f, 0.0f, 2.0f);
+
+        glTexCoord2f(1.0f, 1.0f);
+        glVertex3f(2.0f, 0.0f, 2.0f);
+
+        glTexCoord2f(1.0f, 0.0f);
+        glVertex3f(2.0f, 0.0f, -2.0f);
+
     glEnd();
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
+
+
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
