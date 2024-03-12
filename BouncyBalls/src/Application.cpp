@@ -77,7 +77,7 @@ int main(void)
         return -1;
     }
 
-    //glEnable(GL_TEXTURE_2D);
+    glEnable(GL_TEXTURE_2D);
     unsigned int planeTextureID = loadTexture("src\\planTexture.jpg");
     unsigned int ballTextureID = loadTexture("src\\ballTexture.jpg");
 
@@ -195,6 +195,7 @@ void drawPlane(int textureID) {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
+    //glColor3f(0.0f, 0.0f, 1.0f);
     glBindTexture(GL_TEXTURE_2D, textureID);
 
     glBegin(GL_QUADS);
@@ -214,6 +215,7 @@ void drawPlane(int textureID) {
     glEnd();
 
     glBindTexture(GL_TEXTURE_2D, 0);
+    //glColor3f(1.0f, 1.0f, 1.0f);
 }
 
 
